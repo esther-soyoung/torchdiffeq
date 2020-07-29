@@ -355,9 +355,7 @@ if __name__ == '__main__':
             nfe_backward = feature_layers[0].nfe
             feature_layers[0].nfe = 0
 
-        logger.info('avg time until now: %f' %batch_time_meter.avg)
         batch_time_meter.update(time.time() - end)
-        logger.info('Updated batch_time_meter...avg: %f, val: %f' %(batch_time_meter.avg, batch_time_meter.val))
         if is_odenet:
             f_nfe_meter.update(nfe_forward)
             b_nfe_meter.update(nfe_backward)
