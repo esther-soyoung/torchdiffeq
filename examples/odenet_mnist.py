@@ -161,6 +161,7 @@ class RunningAverageMeter(object):
         else:
             self.avg = self.avg * self.momentum + val * (1 - self.momentum)
         self.val = val
+        logger.info('Updated...avg: %f, val: %f' %(self.avg, self.val))
 
 
 def get_mnist_loaders(data_aug=False, batch_size=128, test_batch_size=1000, perc=1.0):
