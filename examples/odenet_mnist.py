@@ -99,7 +99,7 @@ class ODEfunc(nn.Module):
         self.norm2 = norm(dim)
         self.conv2 = ConcatConv2d(dim, dim, 3, 1, 1)
         self.norm3 = norm(dim)
-        self.nfe = 0
+        self.nfe = 0  # number of function evaluations
 
     def forward(self, t, x):
         self.nfe += 1
@@ -317,6 +317,7 @@ if __name__ == '__main__':
 
     data_gen = inf_generator(train_loader)
     batches_per_epoch = len(train_loader)
+    logger.info('batches_per_epoch: {}'.format(batches_per_epoch))
 
     lr_fn = learning_rate_with_decay(
         args.batch_size, batch_denom=128, batches_per_epoch=batches_per_epoch, boundary_epochs=[60, 100, 140],
