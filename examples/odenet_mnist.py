@@ -161,7 +161,6 @@ class RunningAverageMeter(object):
         else:
             self.avg = self.avg * self.momentum + val * (1 - self.momentum)
         self.val = val
-        logger.info('Updated...avg: %f, val: %f' %(self.avg, self.val))
 
 
 def get_mnist_loaders(data_aug=False, batch_size=128, test_batch_size=1000, perc=1.0):
@@ -356,7 +355,10 @@ if __name__ == '__main__':
             nfe_backward = feature_layers[0].nfe
             feature_layers[0].nfe = 0
 
-        batch_time_meter.update(time.time() - end)
+        tm = time.time() - end
+        batch_time_meter.update(tm)
+        logger.info('time spent for this iteration: %f' %(tm))
+        logger.info('Updated batch_time_meter...avg: %f, val: %f' %(batch_time_meter.avg, batch_time_meter.val))
         if is_odenet:
             f_nfe_meter.update(nfe_forward)
             b_nfe_meter.update(nfe_backward)
