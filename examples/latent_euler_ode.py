@@ -334,7 +334,6 @@ if __name__ == '__main__':
             }, ckpt_path)
             logger.info('Stored ckpt at {}'.format(ckpt_path))
     logger.info('Training complete after {} iters.'.format(itr))
-    print('Training complete after {} iters.'.format(itr))
 
     if args.visualize:
         with torch.no_grad():
@@ -379,4 +378,3 @@ if __name__ == '__main__':
         plt.legend()
         plt.savefig(args.save + '/vis.png', dpi=500)
         logger.info('Saved visualization figure at {}'.format(args.save + '/vis.png'))
-        print('Saved visualization figure at {}'.format(args.save + '/vis.png'))
