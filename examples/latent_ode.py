@@ -282,7 +282,7 @@ if __name__ == '__main__':
             samp_trajs = checkpoint['samp_trajs']
             orig_ts = checkpoint['orig_ts']
             samp_ts = checkpoint['samp_ts']
-            print('Loaded ckpt from {}'.format(ckpt_path))
+            logger.info('Loaded ckpt from {}'.format(ckpt_path))
 
     try:
         batch_time_meter = RunningAverageMeter()
@@ -316,7 +316,7 @@ if __name__ == '__main__':
             optimizer.step()
             loss_meter.update(loss.item())
 
-            print('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
+            logger.info('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
                 itr, -loss_meter.avg, batch_time_meter.val, batch_time_meter.avg))
 
     except KeyboardInterrupt:
@@ -332,8 +332,8 @@ if __name__ == '__main__':
                 'orig_ts': orig_ts,
                 'samp_ts': samp_ts,
             }, ckpt_path)
-            print('Stored ckpt at {}'.format(ckpt_path))
-    print('Training complete after {} iters.'.format(itr))
+            logger.info('Stored ckpt at {}'.format(ckpt_path))
+    logger.info('Training complete after {} iters.'.format(itr))
 
     if args.visualize:
         with torch.no_grad():
@@ -377,4 +377,4 @@ if __name__ == '__main__':
                     :, 1], label='sampled data', s=3)
         plt.legend()
         plt.savefig(args.save + '/vis.png', dpi=500)
-        print('Saved visualization figure at {}'.format(args.save + '/vis.png'))
+        logger.info('Saved visualization figure at {}'.format(args.save + '/vis.png'))
