@@ -301,7 +301,7 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             pred_z = odeint(func, z0, samp_ts).permute(1, 0, 2)
             pred_x = dec(pred_z)
-            batch_time_meter.update(time.time() - end)
+            # batch_time_meter.update(time.time() - end)
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -315,6 +315,7 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             loss_meter.update(loss.item())
+            batch_time_meter.update(time.time() - end)
 
             logger.info('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
                 itr, -loss_meter.avg, batch_time_meter.val, batch_time_meter.avg))
