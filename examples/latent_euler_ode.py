@@ -20,6 +20,7 @@ parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
+parser.add_argument('--save', type=str, default='./latent_euler_out')
 args = parser.parse_args()
 
 if args.adjoint:
@@ -77,8 +78,8 @@ def generate_spiral2d(nspiral=1000,
         plt.plot(orig_traj_cw[:, 0], orig_traj_cw[:, 1], label='clock')
         plt.plot(orig_traj_cc[:, 0], orig_traj_cc[:, 1], label='counter clock')
         plt.legend()
-        plt.savefig('latent_euler_out/ground_truth.png', dpi=500)
-        print('Saved ground truth spiral at {}'.format('latent_euler_out/ground_truth.png'))
+        plt.savefig(args.save + '/ground_truth.png', dpi=500)
+        print('Saved ground truth spiral at {}'.format(args.save + '/ground_truth.png'))
 
     # sample starting timestamps
     orig_trajs = []
@@ -194,6 +195,38 @@ def normal_kl(mu1, lv1, mu2, lv2):
     return kl
 
 
+def makedirs(dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+
+def get_logger(logpath, filepath, package_files=[], displaying=True, saving=True, debug=False):
+    logger = logging.getLogger()
+    if debug:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    logger.setLevel(level)
+    if saving:
+        info_file_handler = logging.FileHandler(logpath, mode="a")
+        info_file_handler.setLevel(level)
+        logger.addHandler(info_file_handler)
+    if displaying:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        logger.addHandler(console_handler)
+    logger.info(filepath)
+    with open(filepath, "r") as f:
+        logger.info(f.read())
+
+    for f in package_files:
+        logger.info(f)
+        with open(f, "r") as package_f:
+            logger.info(package_f.read())
+
+    return logger
+
+
 if __name__ == '__main__':
     latent_dim = 4
     nhidden = 20
@@ -207,6 +240,11 @@ if __name__ == '__main__':
     b = .3
     ntotal = 1000
     nsample = 100
+
+    makedirs(args.save)
+    logger = get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
+    logger.info(args)
+
     device = torch.device('cuda:' + str(args.gpu)
                           if torch.cuda.is_available() else 'cpu')
 
@@ -338,5 +376,5 @@ if __name__ == '__main__':
         plt.scatter(samp_traj[:, 0], samp_traj[
                     :, 1], label='sampled data', s=3)
         plt.legend()
-        plt.savefig('latent_euler_out/vis.png', dpi=500)
-        print('Saved visualization figure at {}'.format('latent_euler_out/vis.png'))
+        plt.savefig(args.save + '/vis.png', dpi=500)
+        print('Saved visualization figure at {}'.format(args.save + '/vis.png'))
