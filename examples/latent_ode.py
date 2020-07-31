@@ -15,11 +15,11 @@ import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--adjoint', type=eval, default=False)
-parser.add_argument('--visualize', type=eval, default=False)
+parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--lr', type=float, default=0.01)
-parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--train_dir', type=str, default=None)
+parser.add_argument('--gpu', type=int, default=3)
+parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 args = parser.parse_args()
 
 if args.adjoint:
@@ -77,8 +77,8 @@ def generate_spiral2d(nspiral=1000,
         plt.plot(orig_traj_cw[:, 0], orig_traj_cw[:, 1], label='clock')
         plt.plot(orig_traj_cc[:, 0], orig_traj_cc[:, 1], label='counter clock')
         plt.legend()
-        plt.savefig('./ground_truth.png', dpi=500)
-        print('Saved ground truth spiral at {}'.format('./ground_truth.png'))
+        plt.savefig('latent_dopri_out/ground_truth.png', dpi=500)
+        print('Saved ground truth spiral at {}'.format('latent_dopri_out/ground_truth.png'))
 
     # sample starting timestamps
     orig_trajs = []
@@ -247,7 +247,9 @@ if __name__ == '__main__':
             print('Loaded ckpt from {}'.format(ckpt_path))
 
     try:
-        for itr in range(1, args.niters + 1):
+        batch_time_meter = RunningAverageMeter()
+        for itr in range(1, args.niters + 1):  # 2000
+            end = time.time()
             optimizer.zero_grad()
             # backward in time to infer q(z_0)
             h = rec.initHidden().to(device)
@@ -261,6 +263,7 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             pred_z = odeint(func, z0, samp_ts).permute(1, 0, 2)
             pred_x = dec(pred_z)
+            batch_time_meter.update(time.time() - end)
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -275,7 +278,8 @@ if __name__ == '__main__':
             optimizer.step()
             loss_meter.update(loss.item())
 
-            print('Iter: {}, running avg elbo: {:.4f}'.format(itr, -loss_meter.avg))
+            print('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
+                itr, -loss_meter.avg, batch_time_meter.val, batch_time_meter.avg))
 
     except KeyboardInterrupt:
         if args.train_dir is not None:
@@ -334,5 +338,5 @@ if __name__ == '__main__':
         plt.scatter(samp_traj[:, 0], samp_traj[
                     :, 1], label='sampled data', s=3)
         plt.legend()
-        plt.savefig('./vis.png', dpi=500)
-        print('Saved visualization figure at {}'.format('./vis.png'))
+        plt.savefig('latent_dopri_out/vis.png', dpi=500)
+        print('Saved visualization figure at {}'.format('latent_dopri_out/vis.png'))
