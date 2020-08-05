@@ -11,16 +11,26 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import random
 
+RANDOM_SEED = 1
+torch.manual_seed(RANDOM_SEED)
+torch.cuda.manual_seed(RANDOM_SEED)
+torch.cuda.manual_seed_all(RANDOM_SEED) # if use multi-GPU
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(RANDOM_SEED)
+random.seed(RANDOM_SEED)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--adjoint', type=eval, default=False)
+parser.add_argument('--adjoint', type=eval, default=True)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 parser.add_argument('--save', type=str, default='./latent_dopri_out')
+parser.add_argument('--method', type=str, default='dopri5')  # euler
 args = parser.parse_args()
 
 if args.adjoint:
@@ -240,6 +250,7 @@ if __name__ == '__main__':
     b = .3
     ntotal = 1000
     nsample = 100
+    randomseed
 
     makedirs(args.save)
     logger = get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
@@ -299,9 +310,9 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
-            pred_z = odeint(func, z0, samp_ts).permute(1, 0, 2)
+            pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_x = dec(pred_z)
-            # batch_time_meter.update(time.time() - end)
+            batch_time_meter.update(time.time() - end)
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -315,7 +326,6 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             loss_meter.update(loss.item())
-            batch_time_meter.update(time.time() - end)
 
             logger.info('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
                 itr, -loss_meter.avg, batch_time_meter.val, batch_time_meter.avg))
@@ -356,8 +366,8 @@ if __name__ == '__main__':
             ts_pos = torch.from_numpy(ts_pos).float().to(device)
             ts_neg = torch.from_numpy(ts_neg).float().to(device)
 
-            zs_pos = odeint(func, z0, ts_pos)
-            zs_neg = odeint(func, z0, ts_neg)
+            zs_pos = odeint(func, z0, ts_pos, method=args.method)
+            zs_neg = odeint(func, z0, ts_neg, method=args.method)
 
             xs_pos = dec(zs_pos)
             xs_neg = torch.flip(dec(zs_neg), dims=[0])
