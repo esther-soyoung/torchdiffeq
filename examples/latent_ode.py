@@ -250,7 +250,6 @@ if __name__ == '__main__':
     b = .3
     ntotal = 1000
     nsample = 100
-    randomseed
 
     makedirs(args.save)
     logger = get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
