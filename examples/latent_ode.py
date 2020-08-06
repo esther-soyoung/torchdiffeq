@@ -31,7 +31,7 @@ parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 parser.add_argument('--save', type=str, default='./latent_dopri_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler
-parser.add_argument('--l2', type=str, default=0)  # weight_decay
+parser.add_argument('--l2', type=float, default=0)  # weight_decay
 args = parser.parse_args()
 
 if args.adjoint:
