@@ -31,7 +31,8 @@ parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 parser.add_argument('--save', type=str, default='./latent_dopri_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler
-parser.add_argument('--l2', type=float, default=0)  # weight_decay
+parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization
+parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.weight_decay)
 args = parser.parse_args()
 
 if args.adjoint:
@@ -276,7 +277,7 @@ if __name__ == '__main__':
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
-    optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.l2)  # L2 reg
+    optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.l2)  # l2 regularization
     loss_meter = RunningAverageMeter()
 
     if args.train_dir is not None:
@@ -322,7 +323,12 @@ if __name__ == '__main__':
             pz0_mean = pz0_logvar = torch.zeros(z0.size()).to(device)
             analytic_kl = normal_kl(qz0_mean, qz0_logvar,
                                     pz0_mean, pz0_logvar).sum(-1)
-            loss = torch.mean(-logpx + analytic_kl, dim=0)
+            # l1 regularization
+            l1 = 0
+            for param in params:
+                l1 += torch.sum(abs(param))
+            loss = torch.mean(-logpx + analytic_kl + args.l1 * l1, dim=0)
+
             loss.backward()
             optimizer.step()
             loss_meter.update(loss.item())
