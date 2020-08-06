@@ -31,6 +31,7 @@ parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 parser.add_argument('--save', type=str, default='./latent_dopri_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler
+parser.add_argument('--l2', type=str, default=0)  # weight_decay
 args = parser.parse_args()
 
 if args.adjoint:
@@ -275,7 +276,7 @@ if __name__ == '__main__':
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
-    optimizer = optim.Adam(params, lr=args.lr)
+    optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.l2)  # L2 reg
     loss_meter = RunningAverageMeter()
 
     if args.train_dir is not None:
