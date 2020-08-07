@@ -299,7 +299,6 @@ if __name__ == '__main__':
     try:
         batch_time_meter = RunningAverageMeter()
         for itr in range(1, args.niters + 1):  # 2000
-            end = time.time()
             optimizer.zero_grad()
             # backward in time to infer q(z_0)
             h = rec.initHidden().to(device)
@@ -311,6 +310,7 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
+            end = time.time()
             pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_x = dec(pred_z)
             batch_time_meter.update(time.time() - end)
