@@ -17,7 +17,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
          ctx.adjoint_options) = func, adjoint_rtol, adjoint_atol, adjoint_method, adjoint_options
 
         with torch.no_grad():
-            ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+            ans, err = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
         ctx.save_for_backward(t, flat_params, *ans)
         return ans
 
