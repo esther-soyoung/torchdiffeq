@@ -311,7 +311,7 @@ if __name__ == '__main__':
 
             # forward in time and solve ode for reconstructions
             end = time.time()
-            pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
+            pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_x = dec(pred_z)
             batch_time_meter.update(time.time() - end)
 
