@@ -277,7 +277,7 @@ if __name__ == '__main__':
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
-    optimizer = optim.Adam(params, lr=args.lr)  # l2 regularization
+    optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.l2)  # l2 regularization
     loss_meter = RunningAverageMeter()
 
     if args.train_dir is not None:
@@ -327,7 +327,7 @@ if __name__ == '__main__':
             l1, l2 = 0, 0
             for param in params:
                 l1 += torch.sum(abs(param))
-                l2 += torch.sum(param ** 2)
+                # l2 += torch.sum(param ** 2)
             loss = torch.mean(-logpx + analytic_kl + args.l1 * l1 + args.l2 * l2, dim=0)
 
             loss.backward()
