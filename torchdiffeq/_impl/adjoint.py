@@ -20,7 +20,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
             # ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
             ans, dopri_err = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
         ctx.save_for_backward(t, flat_params, *ans)
-        return ans
+        return ans, dopri_err
 
     @staticmethod
     def backward(ctx, *grad_output):
