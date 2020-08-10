@@ -36,7 +36,8 @@ parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.we
 args = parser.parse_args()
 
 if args.adjoint:
-    from torchdiffeq import odeint_adjoint as odeint
+    from .torchdiffeq_ import odeint_adjoint as odeint
+    from .torchdiffeq_ import odeint_adjoint as odeint2
 else:
     from torchdiffeq import odeint
 
