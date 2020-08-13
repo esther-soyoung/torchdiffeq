@@ -8,6 +8,8 @@ from .adams import VariableCoefficientAdamsBashforth
 from .dopri8 import Dopri8Solver
 from .misc import _check_inputs
 
+import torch
+
 SOLVERS = {
     'explicit_adams': AdamsBashforth,
     'fixed_adams': AdamsBashforthMoulton,
@@ -23,7 +25,7 @@ SOLVERS = {
 }
 
 
-def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None, return_error=False):
+def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None, dopri_lambda=0, return_error=False):
     """Integrate a system of ordinary differential equations.
 
     Solves the initial value problem for a non-stiff system of first order ODEs:
@@ -84,4 +86,7 @@ def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None, return_
         dopri_err = dopri_err[0]
     if return_error:
         return solution, dopri_err
+    if dopri_lambda != 0:
+        for i in range(len(solution)):
+            solution[i] = solution[i] + dopri_lambda * dopri_err
     return solution

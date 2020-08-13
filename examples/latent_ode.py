@@ -34,7 +34,7 @@ parser.add_argument('--save', type=str, default='./latent_ode_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler
 parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization 0.5
 parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.weight_decay) 0.01
-parser.add_argument('--dopri_err', type=float, default=0)  # dopri error term as  regularizer
+parser.add_argument('--dopri_lambda', type=float, default=0)  # dopri error term as regularizer
 args = parser.parse_args()
 
 if args.adjoint:
@@ -42,7 +42,7 @@ if args.adjoint:
 else:
     from torchdiffeq_ import odeint
 
-from torchdiffeq_ import odeint, odeint_adjoint
+# from torchdiffeq_ import odeint, odeint_adjoint
 
 
 def generate_spiral2d(nspiral=1000,  # 1000 spirals
@@ -316,9 +316,9 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            # pred_z = odeint_adjoint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)  # (1000, 100, 4)
-            pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method, return_error=True)
-            pred_z = pred_z.permute(1, 0, 2)
+            pred_z = odeint(func, z0, samp_ts, method=args.method, dopri_lambda=args.dopri_lambda).permute(1, 0, 2)
+            # pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method, dopri_lambda=args.dopri_lambda, return_error=True)
+            # pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
             batch_time_meter.update(time.time() - end)
 
@@ -336,25 +336,39 @@ if __name__ == '__main__':
             rmse = torch.sqrt(criterion(pred_x, samp_trajs))
 
             # l1, l2 regularization
-            l1, l2 = 0, 0
-            for param in list(func.parameters()):
-                l2 += torch.sum(param ** 2)
-            for param in params:
-                l1 += torch.sum(abs(param))
+            l1 = torch.tensor([0.0], requires_grad=True).to(device)
+            l2 = torch.tensor([0.0], requires_grad=True).to(device)
+            for parameter in func.parameters():
+                l1 = l1 + parameter.norm(1)
+                l2 = l2 + parameter.norm(2)
+            l1 = nn.Parameter(l1)
+            l2 = nn.Parameter(l2)
 
             # dopri error term
-            dopri_error_term = torch.sum(dopri_err, dim=1)
+            # dopri_error_term = torch.sum(dopri_err, dim=1).requires_grad_()
+            # dopri_error_term = nn.Parameter(dopri_error_term)
 
             loss = torch.mean(-logpx + analytic_kl \
                                 + args.l1 * l1 \
                                 + args.l2 * l2 \
-                                + args.dopri_err * dopri_error_term, dim=0)
+                                # + args.dopri_lambda * dopri_error_term \
+                                , dim=0)
+            # dopri_error_term.register_hook(lambda grad: print(grad))
+            # l1.retain_grad()
 
             loss.backward()
+
+            # for index, weight in enumerate(params, start=1):
+            #     gradient, *_ = weight.grad.data
+            #     print("Gradient of w{} w.r.t to L: ".format(index), gradient)
+            # print("Gradient of l1 regularizer w.r.t to loss: ", l1.grad.data)
+            # print("Gradient of l2 regularizer w.r.t to loss: ", l2.grad.data)
+            # print("Gradient of Dopri error regularizer w.r.t to loss: ", dopri_error_term.grad.data)
+
             optimizer.step()
             loss_meter.update(loss.item())
             
-            # print(torch.autograd.gradcheck(odeint_adjoint, (z0, samp_ts)))
+            # print(torch.autograd.gradcheck(odeint, (z0, samp_ts)))
 
             logger.info('#Obs: {}, Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
                 nsample, itr, -loss_meter.avg, rmse, batch_time_meter.val, batch_time_meter.avg))
@@ -390,13 +404,6 @@ if __name__ == '__main__':
             # take first trajectory for visualization
             z0 = z0[0]  # either cc or cw ground-truth
 
-            orig_trajs, samp_trajs, orig_ts, samp_ts = generate_spiral2d(
-                nspiral=nspiral,
-                start=start,
-                stop=stop,
-                noise_std=noise_std,
-                a=a, b=b
-            )
             ts_pos = np.linspace(0., 2. * np.pi, num=2000)  # t>0, reconstruction(prediction)
             ts_neg = np.linspace(-np.pi, 0., num=2000)[::-1].copy()  # t<0, extrapolation
             ts_pos = torch.from_numpy(ts_pos).float().to(device)
