@@ -23,32 +23,34 @@ np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--adjoint', type=eval, default=True)
+parser.add_argument('--adjoint', type=eval, default=False)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
+parser.add_argument('--nsample', type=int, default=100)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
-parser.add_argument('--save', type=str, default='./latent_dopri_out')
+parser.add_argument('--save', type=str, default='./latent_ode_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler
 parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization 0.5
 parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.weight_decay) 0.01
+parser.add_argument('--dopri_err', type=float, default=0)  # dopri error term as  regularizer
 args = parser.parse_args()
 
 if args.adjoint:
     from torchdiffeq_ import odeint_adjoint as odeint
-    # from torchdiffeq import odeint_adjoint as odeint
 else:
     from torchdiffeq_ import odeint
-    # from torchdiffeq import odeint
+
+from torchdiffeq_ import odeint, odeint_adjoint
 
 
-def generate_spiral2d(nspiral=1000,
-                      ntotal=500,
-                      nsample=100,
+def generate_spiral2d(nspiral=1000,  # 1000 spirals
+                      ntotal=500,  # total number of datapoints per spiral
+                      nsample=100,  # sampled(observed) at equally-spaced timesteps
                       start=0.,
                       stop=1,  # approximately equal to 6pi
-                      noise_std=.1,
+                      noise_std=.1,  # guassian noise for reality
                       a=0.,
                       b=1.,
                       savefig=True):
@@ -67,25 +69,25 @@ def generate_spiral2d(nspiral=1000,
     Returns: 
       Tuple where first element is true trajectory of size (nspiral, ntotal, 2),
       second element is noisy observations of size (nspiral, nsample, 2),
-      third element is timestamps of size (ntotal,),
-      and fourth element is timestamps of size (nsample,)
+      third element is timestamps of size (ntotal,),  # whole spiral
+      and fourth element is timestamps of size (nsample,)  # sampled spiral
     """
 
     # add 1 all timestamps to avoid division by 0
-    orig_ts = np.linspace(start, stop, num=ntotal)
-    samp_ts = orig_ts[:nsample]
+    orig_ts = np.linspace(start, stop, num=ntotal)  # evenly spaced 500 timestamps
+    samp_ts = orig_ts[:nsample]  # first 100 timestamps to sample points at
 
     # generate clock-wise and counter clock-wise spirals in observation space
     # with two sets of time-invariant latent dynamics
     zs_cw = stop + 1. - orig_ts
     rs_cw = a + b * 50. / zs_cw
     xs, ys = rs_cw * np.cos(zs_cw) - 5., rs_cw * np.sin(zs_cw)
-    orig_traj_cw = np.stack((xs, ys), axis=1)
+    orig_traj_cw = np.stack((xs, ys), axis=1)  # original trajectory of clockwise spiral
 
     zs_cc = orig_ts
     rw_cc = a + b * zs_cc
     xs, ys = rw_cc * np.cos(zs_cc) + 5., rw_cc * np.sin(zs_cc)
-    orig_traj_cc = np.stack((xs, ys), axis=1)
+    orig_traj_cc = np.stack((xs, ys), axis=1)  # original trajectory of counter-clockwise spiral
 
     if savefig:
         plt.figure()
@@ -96,20 +98,20 @@ def generate_spiral2d(nspiral=1000,
         print('Saved ground truth spiral at {}'.format(args.save + '/ground_truth.png'))
 
     # sample starting timestamps
-    orig_trajs = []
-    samp_trajs = []
-    for _ in range(nspiral):
+    orig_trajs = []  # whole 500 points of all 1000 spirals
+    samp_trajs = []  # sampled 100 points of all 1000 spirals
+    for _ in range(nspiral):  # generate 1000 spirals
         # don't sample t0 very near the start or the end
         t0_idx = npr.multinomial(
             1, [1. / (ntotal - 2. * nsample)] * (ntotal - int(2 * nsample)))
         t0_idx = np.argmax(t0_idx) + nsample
 
-        cc = bool(npr.rand() > .5)  # uniformly select rotation
+        cc = bool(npr.rand() > .5)  # uniformly select rotation (clockwise | counter-clockwise)
         orig_traj = orig_traj_cc if cc else orig_traj_cw
-        orig_trajs.append(orig_traj)
+        orig_trajs.append(orig_traj)  # ground-truth spiral
 
-        samp_traj = orig_traj[t0_idx:t0_idx + nsample, :].copy()
-        samp_traj += npr.randn(*samp_traj.shape) * noise_std
+        samp_traj = orig_traj[t0_idx:t0_idx + nsample, :].copy()  # 100 points starting from t0_idx
+        samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
         samp_trajs.append(samp_traj)
 
     # batching for sample trajectories is good for RNN; batching for original
@@ -124,7 +126,7 @@ class LatentODEfunc(nn.Module):
 
     def __init__(self, latent_dim=4, nhidden=20):
         super(LatentODEfunc, self).__init__()
-        self.elu = nn.ELU(inplace=True)
+        self.elu = nn.ELU(inplace=True)  # one hidden layer network
         self.fc1 = nn.Linear(latent_dim, nhidden)
         self.fc2 = nn.Linear(nhidden, nhidden)
         self.fc3 = nn.Linear(nhidden, latent_dim)
@@ -142,7 +144,7 @@ class LatentODEfunc(nn.Module):
 
 class RecognitionRNN(nn.Module):
 
-    def __init__(self, latent_dim=4, obs_dim=2, nhidden=25, nbatch=1):
+    def __init__(self, latent_dim=4, obs_dim=2, nhidden=25, nbatch=1):  # 2-dimensional spirals
         super(RecognitionRNN, self).__init__()
         self.nhidden = nhidden
         self.nbatch = nbatch
@@ -161,9 +163,9 @@ class RecognitionRNN(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_dim=4, obs_dim=2, nhidden=20):
+    def __init__(self, latent_dim=4, obs_dim=2, nhidden=20):  # 2-dimensional spirals
         super(Decoder, self).__init__()
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=True)  # one hidden layer network
         self.fc1 = nn.Linear(latent_dim, nhidden)
         self.fc2 = nn.Linear(nhidden, obs_dim)
 
@@ -252,8 +254,8 @@ if __name__ == '__main__':
     noise_std = .3
     a = 0.
     b = .3
-    ntotal = 1000
-    nsample = 100
+    # ntotal = 1000
+    nsample = args.nsample  # 100
 
     makedirs(args.save)
     logger = get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
@@ -270,9 +272,9 @@ if __name__ == '__main__':
         noise_std=noise_std,
         a=a, b=b
     )
-    orig_trajs = torch.from_numpy(orig_trajs).float().to(device)
-    samp_trajs = torch.from_numpy(samp_trajs).float().to(device)
-    samp_ts = torch.from_numpy(samp_ts).float().to(device)
+    orig_trajs = torch.from_numpy(orig_trajs).float().to(device)  # (1000, 500, 2) of ground-truth
+    samp_trajs = torch.from_numpy(samp_trajs).float().to(device)  # (1000, 100, 2) of sampled points from orig_trajs
+    samp_ts = torch.from_numpy(samp_ts).float().to(device)  # first 100 timestamps to sample points at
 
     # model
     func = LatentODEfunc(latent_dim, nhidden).to(device)
@@ -282,7 +284,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(params, lr=args.lr) #, weight_decay=args.l2)  # l2 regularization
     loss_meter = RunningAverageMeter()
 
-    if args.train_dir is not None:
+    if args.train_dir is not None:  # pretrained
         if not os.path.exists(args.train_dir):
             os.makedirs(args.train_dir)
         ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
@@ -303,19 +305,21 @@ if __name__ == '__main__':
         for itr in range(1, args.niters + 1):  # 2000
             optimizer.zero_grad()
             # backward in time to infer q(z_0)
-            h = rec.initHidden().to(device)
-            for t in reversed(range(samp_trajs.size(1))):
-                obs = samp_trajs[:, t, :]
-                out, h = rec.forward(obs, h)
-            qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]
+            h = rec.initHidden().to(device)  # nhidden=25, nbatch=1
+            for t in reversed(range(samp_trajs.size(1))):  # 100
+                obs = samp_trajs[:, t, :]  # (1000, 2). t'th observed(sampled) point of each spiral
+                out, h = rec.forward(obs, h)  # recognition RNN
+            qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]  # latent_dim=4
             epsilon = torch.randn(qz0_mean.size()).to(device)
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
             end = time.time()
-            pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            # pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_x = dec(pred_z)
+            # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
+            # pred_z = odeint_adjoint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)  # (1000, 100, 4)
+            pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method, return_error=True)
+            pred_z = pred_z.permute(1, 0, 2)
+            pred_x = dec(pred_z)  # (1000, 100, 2)
             batch_time_meter.update(time.time() - end)
 
             # compute loss
@@ -326,20 +330,34 @@ if __name__ == '__main__':
             pz0_mean = pz0_logvar = torch.zeros(z0.size()).to(device)
             analytic_kl = normal_kl(qz0_mean, qz0_logvar,
                                     pz0_mean, pz0_logvar).sum(-1)
-            # regularization
+
+            # compute RMSE
+            criterion = nn.MSELoss()
+            rmse = torch.sqrt(criterion(pred_x, samp_trajs))
+
+            # l1, l2 regularization
             l1, l2 = 0, 0
             for param in list(func.parameters()):
-            # for param in params:
-                l1 += torch.sum(abs(param))
                 l2 += torch.sum(param ** 2)
-            loss = torch.mean(-logpx + analytic_kl + args.l1 * l1 + args.l2 * l2, dim=0)
+            for param in params:
+                l1 += torch.sum(abs(param))
+
+            # dopri error term
+            dopri_error_term = torch.sum(dopri_err, dim=1)
+
+            loss = torch.mean(-logpx + analytic_kl \
+                                + args.l1 * l1 \
+                                + args.l2 * l2 \
+                                + args.dopri_err * dopri_error_term, dim=0)
 
             loss.backward()
             optimizer.step()
             loss_meter.update(loss.item())
+            
+            # print(torch.autograd.gradcheck(odeint_adjoint, (z0, samp_ts)))
 
-            logger.info('Iter: {}, Running avg elbo: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
-                itr, -loss_meter.avg, batch_time_meter.val, batch_time_meter.avg))
+            logger.info('#Obs: {}, Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
+                nsample, itr, -loss_meter.avg, rmse, batch_time_meter.val, batch_time_meter.avg))
 
     except KeyboardInterrupt:
         if args.train_dir is not None:
@@ -361,7 +379,7 @@ if __name__ == '__main__':
         with torch.no_grad():
             # sample from trajectorys' approx. posterior
             h = rec.initHidden().to(device)
-            for t in reversed(range(samp_trajs.size(1))):
+            for t in reversed(range(samp_trajs.size(1))):  # 100
                 obs = samp_trajs[:, t, :]
                 out, h = rec.forward(obs, h)
             qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]
@@ -370,14 +388,23 @@ if __name__ == '__main__':
             orig_ts = torch.from_numpy(orig_ts).float().to(device)
 
             # take first trajectory for visualization
-            z0 = z0[0]
+            z0 = z0[0]  # either cc or cw ground-truth
 
-            ts_pos = np.linspace(0., 2. * np.pi, num=2000)
-            ts_neg = np.linspace(-np.pi, 0., num=2000)[::-1].copy()
+            orig_trajs, samp_trajs, orig_ts, samp_ts = generate_spiral2d(
+                nspiral=nspiral,
+                start=start,
+                stop=stop,
+                noise_std=noise_std,
+                a=a, b=b
+            )
+            ts_pos = np.linspace(0., 2. * np.pi, num=2000)  # t>0, reconstruction(prediction)
+            ts_neg = np.linspace(-np.pi, 0., num=2000)[::-1].copy()  # t<0, extrapolation
             ts_pos = torch.from_numpy(ts_pos).float().to(device)
             ts_neg = torch.from_numpy(ts_neg).float().to(device)
 
+            # zs_pos = odeint_adjoint(func, z0, ts_pos, method=args.method)
             zs_pos = odeint(func, z0, ts_pos, method=args.method)
+            # zs_neg = odeint_adjoint(func, z0, ts_neg, method=args.method)
             zs_neg = odeint(func, z0, ts_neg, method=args.method)
 
             xs_pos = dec(zs_pos)
@@ -391,12 +418,12 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(orig_traj[:, 0], orig_traj[:, 1],
                  'g', label='true trajectory')
-        plt.plot(xs_pos[:, 0], xs_pos[:, 1], 'r',
-                 label='learned trajectory (t>0)')
-        plt.plot(xs_neg[:, 0], xs_neg[:, 1], 'c',
-                 label='learned trajectory (t<0)')
-        plt.scatter(samp_traj[:, 0], samp_traj[
-                    :, 1], label='sampled data', s=3)
+        plt.plot(xs_pos[:, 0], xs_pos[:, 1], 'c',
+                 label='learned trajectory (t>0): prediction(reconstruction)')
+        plt.plot(xs_neg[:, 0], xs_neg[:, 1], 'r',
+                 label='learned trajectory (t<0): extrapolation')
+        plt.scatter(samp_traj[:, 0], samp_traj[:, 1], 
+                    label='sampled data', s=3)  # observed points from gound-truth
         plt.legend()
         plt.savefig(args.save + '/vis.png', dpi=500)
         logger.info('Saved visualization figure at {}'.format(args.save + '/vis.png'))

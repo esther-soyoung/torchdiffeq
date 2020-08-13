@@ -23,7 +23,7 @@ SOLVERS = {
 }
 
 
-def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None):
+def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None, return_error=False):
     """Integrate a system of ordinary differential equations.
 
     Solves the initial value problem for a non-stiff system of first order ODEs:
@@ -77,10 +77,11 @@ def odeint(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None):
 
     solver = SOLVERS[method](func, y0, rtol=rtol, atol=atol, **options)
     solution = solver.integrate(t)
-    # dopri_err = solver.dopri_err
+    dopri_err = solver.dopri_err
 
     if tensor_input:
         solution = solution[0]
-        # dopri_err = dopri_err[0]
+        dopri_err = dopri_err[0]
+    if return_error:
+        return solution, dopri_err
     return solution
-    # return solution, dopri_err

@@ -74,7 +74,7 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         self.dfactor = _convert_to_tensor(dfactor, dtype=torch.float64, device=y0[0].device)
         self.max_num_steps = _convert_to_tensor(max_num_steps, dtype=torch.int32, device=y0[0].device)
 
-        # self.dopri_err = 0
+        self.dopri_err = 0
 
     def before_integrate(self, t):
         f0 = self.func(t[0].type_as(self.y0[0]), self.y0)
@@ -90,7 +90,6 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         while next_t > self.rk_state.t1:
             assert n_steps < self.max_num_steps, 'max_num_steps exceeded ({}>={})'.format(n_steps, self.max_num_steps)
             self.rk_state = self._adaptive_dopri5_step(self.rk_state)
-            # self.rk_state, self.dopri_err = self._adaptive_dopri5_step(self.rk_state)
             n_steps += 1
         return _interp_evaluate(self.rk_state.interp_coeff, self.rk_state.t0, self.rk_state.t1, next_t)
 
@@ -104,6 +103,7 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         for y0_ in y0:
             assert _is_finite(torch.abs(y0_)), 'non-finite values in state `y`: {}'.format(y0_)
         y1, f1, y1_error, k = _runge_kutta_step(self.func, y0, f0, t0, dt, tableau=_DORMAND_PRINCE_SHAMPINE_TABLEAU)
+        self.dopri_err = y1_error
 
         ########################################################
         #                     Error Ratio                      #
@@ -123,4 +123,3 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         )
         rk_state = _RungeKuttaState(y_next, f_next, t0, t_next, dt_next, interp_coeff)
         return rk_state
-        # return rk_state, y1_error
