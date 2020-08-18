@@ -41,16 +41,18 @@ def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
     """
     dtype = y0[0].dtype
     device = y0[0].device
-
+    tot_dt = []
     t0 = _convert_to_tensor(t0, dtype=dtype, device=device)
     dt = _convert_to_tensor(dt, dtype=dtype, device=device)
-
     k = tuple(map(lambda x: [x], f0))
+    yi = tuple(y0)
     for alpha_i, beta_i in zip(tableau.alpha, tableau.beta):
         ti = t0 + alpha_i * dt
+        #if ti>1:
+        #    break
+        #tot_dt.append(alpha_i*dt)
         yi = tuple(y0_ + _scaled_dot_product(dt, beta_i, k_) for y0_, k_ in zip(y0, k))
         tuple(k_.append(f_) for k_, f_ in zip(k, func(ti, yi)))
-
     if not (tableau.c_sol[-1] == 0 and tableau.c_sol[:-1] == tableau.beta[-1]):
         # This property (true for Dormand-Prince) lets us save a few FLOPs.
         yi = tuple(y0_ + _scaled_dot_product(dt, tableau.c_sol, k_) for y0_, k_ in zip(y0, k))
@@ -58,7 +60,7 @@ def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
     y1 = yi
     f1 = tuple(k_[-1] for k_ in k)
     y1_error = tuple(_scaled_dot_product(dt, tableau.c_error, k_) for k_ in k)
-    return (y1, f1, y1_error, k)
+    return (y1, f1, y1_error, k), tot_dt
 
 
 def rk4_step_func(func, t, dt, y, k1=None):

@@ -23,7 +23,7 @@ np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--adjoint', type=eval, default=False)
+parser.add_argument('--adjoint', type=eval, default=True)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--nsample', type=int, default=100)
@@ -31,7 +31,7 @@ parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
 parser.add_argument('--save', type=str, default='./latent_ode_out')
-parser.add_argument('--method', type=str, default='dopri5')  # euler
+parser.add_argument('--method', type=str, default='dopri5')  # euler, dopri5_err
 parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization 0.5
 parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.weight_decay) 0.01
 parser.add_argument('--dopri_lambda', type=float, default=0)  # dopri error term as regularizer
@@ -316,9 +316,7 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_z = odeint(func, z0, samp_ts, method=args.method, dopri_lambda=args.dopri_lambda).permute(1, 0, 2)
-            # pred_z, dopri_err = odeint(func, z0, samp_ts, method=args.method, dopri_lambda=args.dopri_lambda, return_error=True)
-            # pred_z = pred_z.permute(1, 0, 2)
+            pred_z, err = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
             batch_time_meter.update(time.time() - end)
 
@@ -426,7 +424,7 @@ if __name__ == '__main__':
         plt.plot(orig_traj[:, 0], orig_traj[:, 1],
                  'g', label='true trajectory')
         plt.plot(xs_pos[:, 0], xs_pos[:, 1], 'c',
-                 label='learned trajectory (t>0): prediction(reconstruction)')
+                 label='learned trajectory (t>0): interpolation(reconstruction)')
         plt.plot(xs_neg[:, 0], xs_neg[:, 1], 'r',
                  label='learned trajectory (t<0): extrapolation')
         plt.scatter(samp_traj[:, 0], samp_traj[:, 1], 

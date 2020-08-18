@@ -33,6 +33,50 @@ class AdaptiveStepsizeODESolver(object):
         return tuple(map(torch.stack, tuple(zip(*solution))))
 
 
+class AdaptiveStepsizeODEErrSolver(object):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, func, y0, atol, rtol, **unused_kwargs):
+        _handle_unused_kwargs(self, unused_kwargs)
+        del unused_kwargs
+        self.func = func
+        self.y0 = y0
+        self.atol = atol
+        self.rtol = rtol
+
+    def before_integrate(self, t):
+        pass
+
+
+    @abc.abstractmethod
+    def advance(self, next_t):
+        raise NotImplementedError
+
+    def integrate(self, t):
+        _assert_increasing(t)
+        solution = [self.y0]
+        t = t.to(self.y0[0].device, torch.float64)
+        tot_err = []
+        self.before_integrate(t)
+        for i in range(1, len(t)):
+            y, err = self.advance(t[i])
+            # print(y)
+            # print(y[0])
+            # print(y[0].shape) # 128*64*6*6
+            # if tot_err is None:
+            #     tot_err = err
+            # else:
+            #     tot_err = tot_err + err
+            tot_err+=err
+            solution.append(y)
+        # print(len(solution))
+        # tmp = tuple(zip(*solution))
+        # print(len(tmp[0]))
+        # print(tot_err)
+        return tuple(map(torch.stack, tuple(zip(*solution)))), tot_err
+    
+
+
 class FixedGridODESolver(object):
     __metaclass__ = abc.ABCMeta
 

@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
 from . import odeint
+from . import odeint_err
 from .misc import _flatten, _flatten_convert_none_to_zeros
 
 
 class OdeintAdjointMethod(torch.autograd.Function):
-
+    total_err=None
     @staticmethod
     def forward(ctx, *args):
         assert len(args) >= 8, 'Internal error: all arguments required.'
@@ -17,7 +18,11 @@ class OdeintAdjointMethod(torch.autograd.Function):
          ctx.adjoint_options) = func, adjoint_rtol, adjoint_atol, adjoint_method, adjoint_options
 
         # with torch.no_grad():
-        ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+        ans, err = odeint_err(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+        if OdeintAdjointMethod.total_err is None:
+            OdeintAdjointMethod.total_err = err
+        else:
+            OdeintAdjointMethod.total_err += err
         ctx.save_for_backward(t, flat_params, *ans)
         return ans
 
@@ -106,7 +111,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
 
 
 def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None, adjoint_rtol=None, adjoint_atol=None,
-                   adjoint_method=None, adjoint_options=None, dopri_lambda=0):
+                   adjoint_method=None, adjoint_options=None):
 
     # We need this in order to access the variables inside this module,
     # since we have no other way of getting variables along the execution path.
@@ -141,7 +146,8 @@ def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None
     flat_params = _flatten(func.parameters())
     ys = OdeintAdjointMethod.apply(*y0, func, t, flat_params, rtol, atol, method, options, adjoint_rtol, adjoint_atol,
                                    adjoint_method, adjoint_options)
-
+    err = OdeintAdjointMethod.total_err
+    OdeintAdjointMethod.total_err=None
     if tensor_input:
         ys = ys[0]
-    return ys
+    return ys, err

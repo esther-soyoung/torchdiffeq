@@ -57,7 +57,6 @@ def _interp_evaluate(coefficients, t0, t1, t):
 
     assert (t0 <= t) & (t <= t1), 'invalid interpolation, fails `t0 <= t <= t1`: {}, {}, {}'.format(t0, t, t1)
     x = ((t - t0) / (t1 - t0)).type(dtype).to(device)
-
     xs = [torch.tensor(1).type(dtype).to(device), x]
     for _ in range(2, len(coefficients)):
         xs.append(xs[-1] * x)
