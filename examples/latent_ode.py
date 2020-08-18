@@ -76,6 +76,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
     # add 1 all timestamps to avoid division by 0
     orig_ts = np.linspace(start, stop, num=ntotal)  # evenly spaced 500 timestamps
     samp_ts = orig_ts[:nsample]  # first 100 timestamps to sample points at
+    test_ts = orig_ts[-nsample:]  # last 100 timestamps to test
 
     # generate clock-wise and counter clock-wise spirals in observation space
     # with two sets of time-invariant latent dynamics
@@ -100,6 +101,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
     # sample starting timestamps
     orig_trajs = []  # whole 500 points of all 1000 spirals
     samp_trajs = []  # sampled 100 points of all 1000 spirals
+    test_trajs = []  # 100 points from t<0 for testing
     for _ in range(nspiral):  # generate 1000 spirals
         # don't sample t0 very near the start or the end
         t0_idx = npr.multinomial(
@@ -114,12 +116,17 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
         samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
         samp_trajs.append(samp_traj)
 
+        test_traj = orig_traj[t0_idx - nsample:t0_idx, :].copy()  # 100 points starting from t0_idx
+        test_traj += npr.randn(*test_traj.shape) * noise_std  # add guassian noise for observation reality
+        test_trajs.append(test_traj)
+
     # batching for sample trajectories is good for RNN; batching for original
     # trajectories only for ease of indexing
     orig_trajs = np.stack(orig_trajs, axis=0)
     samp_trajs = np.stack(samp_trajs, axis=0)
+    test_trajs = np.stack(test_trajs, axis=0)
 
-    return orig_trajs, samp_trajs, orig_ts, samp_ts
+    return orig_trajs, samp_trajs, orig_ts, samp_ts, test_trajs, test_ts
 
 
 class LatentODEfunc(nn.Module):
@@ -265,7 +272,7 @@ if __name__ == '__main__':
                           if torch.cuda.is_available() else 'cpu')
 
     # generate toy spiral data
-    orig_trajs, samp_trajs, orig_ts, samp_ts = generate_spiral2d(
+    orig_trajs, samp_trajs, orig_ts, samp_ts, test_trajs, test_ts = generate_spiral2d(
         nspiral=nspiral,
         start=start,
         stop=stop,
@@ -275,6 +282,8 @@ if __name__ == '__main__':
     orig_trajs = torch.from_numpy(orig_trajs).float().to(device)  # (1000, 500, 2) of ground-truth
     samp_trajs = torch.from_numpy(samp_trajs).float().to(device)  # (1000, 100, 2) of sampled points from orig_trajs
     samp_ts = torch.from_numpy(samp_ts).float().to(device)  # first 100 timestamps to sample points at
+    test_trajs = torch.from_numpy(test_trajs).float().to(device)  # (1000, 100, 2) of test points from orig_trajs
+    test_ts = torch.from_numpy(test_ts).float().to(device)  # last 100 timestamps to test points at
 
     # model
     func = LatentODEfunc(latent_dim, nhidden).to(device)
@@ -302,6 +311,7 @@ if __name__ == '__main__':
 
     try:
         batch_time_meter = RunningAverageMeter()
+        print('*' * 15 + 'start training' + '*' * 15)  # interpolation
         for itr in range(1, args.niters + 1):  # 2000
             optimizer.zero_grad()
             # backward in time to infer q(z_0)
@@ -381,6 +391,29 @@ if __name__ == '__main__':
             logger.info('Stored ckpt at {}'.format(ckpt_path))
     logger.info('Training complete after {} iters.'.format(itr))
 
+    ## Test(extrapolation)
+    print('*' * 15 + 'start testing' + '*' * 15)
+    with torch.no_grad():
+        h = rec.initHidden().to(device)
+        for t in reversed(range(test_trajs.size(1))):  # 100
+            obs = test_trajs[:, t, :]  # (1000, 2). t'th point of each spiral
+            out, h = rec.forward(obs, h)  # recognition RNN
+        qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]  # latent_dim=4
+        epsilon = torch.randn(qz0_mean.size()).to(device)
+        z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
+
+        # forward in time and solve ode for reconstructions
+        end = time.time()
+        pred_z = odeint(func, z0, test_ts, method=args.method).permute(1, 0, 2)
+        pred_x = dec(pred_z)
+        tim = time.time() - end
+
+        # compute RMSE
+        criterion = nn.MSELoss()
+        rmse = torch.sqrt(criterion(pred_x, test_trajs))
+    logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
+
+    ## Visualize
     if args.visualize:
         with torch.no_grad():
             # sample from trajectorys' approx. posterior
