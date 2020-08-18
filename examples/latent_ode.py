@@ -275,7 +275,11 @@ if __name__ == '__main__':
             optimizer.step()
             loss_meter.update(loss.item())
 
-            print('Iter: {}, running avg elbo: {:.4f}'.format(itr, -loss_meter.avg))
+            # RMSE
+            criterion = nn.MSELoss()
+            rmse = torch.sqrt(criterion(pred_x, samp_trajs))
+
+            print('Iter: {}, running avg elbo: {:.4f}, RMSE: {:.4f}'.format(itr, -loss_meter.avg, rmse))
 
     except KeyboardInterrupt:
         if args.train_dir is not None:
