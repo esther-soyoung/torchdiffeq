@@ -50,7 +50,7 @@ def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
         ti = t0 + alpha_i * dt
         #if ti>1:
         #    break
-        #tot_dt.append(alpha_i*dt)
+        tot_dt.append(alpha_i*dt)
         yi = tuple(y0_ + _scaled_dot_product(dt, beta_i, k_) for y0_, k_ in zip(y0, k))
         tuple(k_.append(f_) for k_, f_ in zip(k, func(ti, yi)))
     if not (tableau.c_sol[-1] == 0 and tableau.c_sol[:-1] == tableau.beta[-1]):

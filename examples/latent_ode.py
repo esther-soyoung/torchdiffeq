@@ -23,7 +23,7 @@ np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--adjoint', type=eval, default=True)
+parser.add_argument('--adjoint', type=eval, default=False)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--nsample', type=int, default=100)
@@ -40,10 +40,10 @@ args = parser.parse_args()
 if args.adjoint:
     from torchdiffeq_ import odeint_adjoint as odeint
 else:
-    from torchdiffeq_ import odeint
+    from torchdiffeq_ import odeint_err as odeint_err
+    from torchdiffeq_ import odeint as odeint
 
 # from torchdiffeq_ import odeint, odeint_adjoint
-
 
 def generate_spiral2d(nspiral=1000,  # 1000 spirals
                       ntotal=500,  # total number of datapoints per spiral
@@ -316,7 +316,8 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_z, err = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
+            pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
+            pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
             batch_time_meter.update(time.time() - end)
 
@@ -342,18 +343,11 @@ if __name__ == '__main__':
             l1 = nn.Parameter(l1)
             l2 = nn.Parameter(l2)
 
-            # dopri error term
-            # dopri_error_term = torch.sum(dopri_err, dim=1).requires_grad_()
-            # dopri_error_term = nn.Parameter(dopri_error_term)
-
-            loss = torch.mean(-logpx + analytic_kl \
-                                + args.l1 * l1 \
-                                + args.l2 * l2 \
-                                # + args.dopri_lambda * dopri_error_term \
-                                , dim=0)
-            # dopri_error_term.register_hook(lambda grad: print(grad))
-            # l1.retain_grad()
-
+            loss = torch.mean(-logpx + analytic_kl, dim=0)
+            # loss += args.l1 * l1
+            # loss += args.l2 * l2
+            loss += args.dopri_lambda * torch.mean(torch.stack(err))
+            
             loss.backward()
 
             # for index, weight in enumerate(params, start=1):
@@ -361,8 +355,8 @@ if __name__ == '__main__':
             #     print("Gradient of w{} w.r.t to L: ".format(index), gradient)
             # print("Gradient of l1 regularizer w.r.t to loss: ", l1.grad.data)
             # print("Gradient of l2 regularizer w.r.t to loss: ", l2.grad.data)
-            # print("Gradient of Dopri error regularizer w.r.t to loss: ", dopri_error_term.grad.data)
-
+            # logger.info("Gradient of Dopri error regularizer w.r.t to loss: ", tmp.grad.data)
+            
             optimizer.step()
             loss_meter.update(loss.item())
             
@@ -407,9 +401,7 @@ if __name__ == '__main__':
             ts_pos = torch.from_numpy(ts_pos).float().to(device)
             ts_neg = torch.from_numpy(ts_neg).float().to(device)
 
-            # zs_pos = odeint_adjoint(func, z0, ts_pos, method=args.method)
             zs_pos = odeint(func, z0, ts_pos, method=args.method)
-            # zs_neg = odeint_adjoint(func, z0, ts_neg, method=args.method)
             zs_neg = odeint(func, z0, ts_neg, method=args.method)
 
             xs_pos = dec(zs_pos)

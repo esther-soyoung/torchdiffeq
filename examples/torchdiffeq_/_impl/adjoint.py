@@ -6,7 +6,7 @@ from .misc import _flatten, _flatten_convert_none_to_zeros
 
 
 class OdeintAdjointMethod(torch.autograd.Function):
-    total_err=None
+    total_err=[]
     @staticmethod
     def forward(ctx, *args):
         assert len(args) >= 8, 'Internal error: all arguments required.'
@@ -17,12 +17,9 @@ class OdeintAdjointMethod(torch.autograd.Function):
         (ctx.func, ctx.adjoint_rtol, ctx.adjoint_atol, ctx.adjoint_method,
          ctx.adjoint_options) = func, adjoint_rtol, adjoint_atol, adjoint_method, adjoint_options
 
-        # with torch.no_grad():
-        ans, err = odeint_err(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
-        if OdeintAdjointMethod.total_err is None:
-            OdeintAdjointMethod.total_err = err
-        else:
-            OdeintAdjointMethod.total_err += err
+        with torch.no_grad():
+            ans, err = odeint_err(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+        OdeintAdjointMethod.total_err += err
         ctx.save_for_backward(t, flat_params, *ans)
         return ans
 
@@ -147,7 +144,7 @@ def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None
     ys = OdeintAdjointMethod.apply(*y0, func, t, flat_params, rtol, atol, method, options, adjoint_rtol, adjoint_atol,
                                    adjoint_method, adjoint_options)
     err = OdeintAdjointMethod.total_err
-    OdeintAdjointMethod.total_err=None
+    OdeintAdjointMethod.total_err=[]
     if tensor_input:
         ys = ys[0]
-    return ys, err
+    return ys, []

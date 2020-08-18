@@ -101,7 +101,7 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         assert t0 + dt > t0, 'underflow in dt {}'.format(dt.item())
         for y0_ in y0:
             assert _is_finite(torch.abs(y0_)), 'non-finite values in state `y`: {}'.format(y0_)
-        y1, f1, y1_error, k = _runge_kutta_step(self.func, y0, f0, t0, dt, tableau=_DORMAND_PRINCE_SHAMPINE_TABLEAU)
+        (y1, f1, y1_error, k), _ = _runge_kutta_step(self.func, y0, f0, t0, dt, tableau=_DORMAND_PRINCE_SHAMPINE_TABLEAU)
 
         ########################################################
         #                     Error Ratio                      #
