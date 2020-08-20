@@ -1,4 +1,5 @@
 import os
+import glob
 import argparse
 import logging
 import time
@@ -312,6 +313,8 @@ if __name__ == '__main__':
     try:
         batch_time_meter = RunningAverageMeter()
         print('*' * 15 + 'start training' + '*' * 15)  # interpolation
+        epoch_nfe = []
+        best_rmse = {}
         for itr in range(1, args.niters + 1):  # 2000
             optimizer.zero_grad()
             # backward in time to infer q(z_0)
@@ -324,12 +327,17 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
+            func.nfe = 0
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
             pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
             batch_time_meter.update(time.time() - end)
+
+            # nfe
+            iter_nfe = func.nfe
+            epoch_nfe.append(iter_nfe)
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -356,7 +364,8 @@ if __name__ == '__main__':
             loss = torch.mean(-logpx + analytic_kl, dim=0)
             # loss += args.l1 * l1
             # loss += args.l2 * l2
-            loss += args.dopri_lambda * torch.mean(torch.stack(err))
+            # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
+            loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
             
             loss.backward()
 
@@ -369,11 +378,59 @@ if __name__ == '__main__':
             
             optimizer.step()
             loss_meter.update(loss.item())
-            
+
             # print(torch.autograd.gradcheck(odeint, (z0, samp_ts)))
 
-            logger.info('#Obs: {}, Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, Time: {:.3f} (avg {:.3f})'.format(
-                nsample, itr, -loss_meter.avg, rmse, batch_time_meter.val, batch_time_meter.avg))
+            logger.info('#Obs: {}, Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, NFE: {}, Time: {:.3f} (avg {:.3f})'.format(
+                nsample, itr, -loss_meter.avg, rmse, iter_nfe, batch_time_meter.val, batch_time_meter.avg))
+
+            # save model
+            if itr == 1:
+                best_rmse['itr'] = itr
+                best_rmse['running_avg_elbo'] = -loss_meter.avg
+                best_rmse['rmse'] = rmse
+                best_rmse['nfe'] = iter_nfe
+                best_rmse['time'] = batch_time_meter.val
+                best_rmse['avg_time'] = batch_time_meter.avg
+                if args.train_dir is not None:
+                    ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
+                    torch.save({
+                        'func_state_dict': func.state_dict(),
+                        'rec_state_dict': rec.state_dict(),
+                        'dec_state_dict': dec.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'orig_trajs': orig_trajs,
+                        'samp_trajs': samp_trajs,
+                        'orig_ts': orig_ts,
+                        'samp_ts': samp_ts,
+                    }, ckpt_path)
+                    logger.info('Stored ckpt at {}'.format(ckpt_path))
+            # update model
+            elif rmse < best_rmse['rmse']:
+                best_rmse['itr'] = itr
+                best_rmse['running_avg_elbo'] = -loss_meter.avg
+                best_rmse['rmse'] = rmse
+                best_rmse['nfe'] = iter_nfe
+                best_rmse['time'] = batch_time_meter.val
+                best_rmse['avg_time'] = batch_time_meter.avg
+                if args.train_dir is not None:
+                    ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
+                    torch.save({
+                        'func_state_dict': func.state_dict(),
+                        'rec_state_dict': rec.state_dict(),
+                        'dec_state_dict': dec.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'orig_trajs': orig_trajs,
+                        'samp_trajs': samp_trajs,
+                        'orig_ts': orig_ts,
+                        'samp_ts': samp_ts,
+                    }, ckpt_path)
+                    logger.info('Stored ckpt at {}'.format(ckpt_path))
+        epoch_nfe = np.array(epoch_nfe)
+        logger.info('avg training NFE: {:.4f}'.format(np.mean(epoch_nfe)))
+        logger.info('==>Best validation==>')
+        logger.info('Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, NFE: {}, Time: {:.3f} (avg {:.3f})'.format(
+            best_rmse['itr'], best_rmse['running_avg_elbo'], best_rmse['rmse'], best_rmse['nfe'], best_rmse['time'], best_rmse['avg_time']))
 
     except KeyboardInterrupt:
         if args.train_dir is not None:
@@ -393,6 +450,18 @@ if __name__ == '__main__':
 
     ## Test(extrapolation)
     print('*' * 15 + 'start testing' + '*' * 15)
+    if args.train_dir is not None:
+        ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
+        checkpoint = torch.load(ckpt_path)
+        func.load_state_dict(checkpoint['func_state_dict'])
+        rec.load_state_dict(checkpoint['rec_state_dict'])
+        dec.load_state_dict(checkpoint['dec_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        orig_trajs = checkpoint['orig_trajs']
+        samp_trajs = checkpoint['samp_trajs']
+        orig_ts = checkpoint['orig_ts']
+        samp_ts = checkpoint['samp_ts']
+        logger.info('Loaded ckpt from {}'.format(ckpt_path))
     with torch.no_grad():
         h = rec.initHidden().to(device)
         for t in reversed(range(test_trajs.size(1))):  # 100
@@ -412,6 +481,9 @@ if __name__ == '__main__':
         criterion = nn.MSELoss()
         rmse = torch.sqrt(criterion(pred_x, test_trajs))
     logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
+    # remove checkpoint
+    for f in glob.glob(args.train_dir):
+        os.remove(f)
 
     ## Visualize
     if args.visualize:
