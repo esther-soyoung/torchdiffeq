@@ -28,6 +28,7 @@ parser.add_argument('--adjoint', type=eval, default=False)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--test', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
+parser.add_argument('--ntotal', type=int, default=500)  # total number of points in spiral
 parser.add_argument('--nsample', type=int, default=100)
 parser.add_argument('--ntest', type=int, default=100)  # number of testing points
 parser.add_argument('--lr', type=float, default=0.01)
