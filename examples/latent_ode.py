@@ -32,7 +32,7 @@ parser.add_argument('--nsample', type=int, default=400)  # number of observed po
 parser.add_argument('--ntest', type=int, default=100)  # number of points to extrapolate(testing)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
-parser.add_argument('--train_dir', type=str, default=None)  # pretrained
+parser.add_argument('--train_dir', type=str, default='./checkpoint')  # pretrained
 parser.add_argument('--save', type=str, default='./latent_ode_out')
 parser.add_argument('--method', type=str, default='dopri5')  # euler, dopri5_err
 parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization 0.5
