@@ -55,7 +55,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
                       ntest=100,
                       start=0.,
                       stop=1,  # approximately equal to 6pi
-                      noise_std=.1,  # guassian noise for reality
+                      noise_std=.01,  # guassian noise for reality
                       a=0.,
                       b=1.,
                       savefig=True):
@@ -119,7 +119,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
         orig_trajs.append(orig_traj)  # ground-truth spiral
 
         samp_traj = orig_traj[t0_idx:t0_idx + nsample, :].copy()  # 100 points starting from t0_idx
-        # samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
+        samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
         samp_trajs.append(samp_traj)
 
         test_traj = orig_traj[t0_idx - ntest:t0_idx, :][::-1].copy()  # 100 previous points from t0_idx
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     nspiral = 1000
     start = 0.
     stop = 6 * np.pi  # 19
-    noise_std = .3
+    noise_std = .03
     a = 0.
     b = .3
     # ntotal = 1000

@@ -263,7 +263,7 @@ if __name__ == '__main__':
     nspiral = 1000
     start = 0.
     stop = 6 * np.pi
-    noise_std = .3
+    noise_std = .03
     a = 0.
     b = .3
     # ntotal = 1000
