@@ -31,6 +31,7 @@ parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--ntotal', type=int, default=500)  # total number of points in spiral
 parser.add_argument('--nsample', type=int, default=100)  # number of observed points for training
 parser.add_argument('--ntest', type=int, default=100)  # number of testing points
+parser.add_argument('--noise', type=float, default=0.1)  # gaussian noise stdv
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default='./checkpoint')  # pretrained
@@ -264,7 +265,7 @@ if __name__ == '__main__':
     nspiral = 1000
     start = 0.
     stop = 6 * np.pi  # 19
-    noise_std = .03
+    # noise_std = .03
     a = 0.
     b = .3
     # ntotal = 1000
@@ -284,7 +285,7 @@ if __name__ == '__main__':
         ntest=args.ntest,
         start=start,
         stop=stop,
-        noise_std=noise_std,
+        noise_std=args.noise,
         a=a, b=b
     )
     orig_trajs = torch.from_numpy(orig_trajs).float().to(device)  # (1000, 500, 2) of ground-truth
