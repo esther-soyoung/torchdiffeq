@@ -481,9 +481,6 @@ if __name__ == '__main__':
         criterion = nn.MSELoss()
         rmse = torch.sqrt(criterion(pred_x, test_trajs))
     logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
-    # remove checkpoint
-    for f in glob.glob(args.train_dir):
-        os.remove(f)
 
     ## Visualize
     if args.visualize:
@@ -530,3 +527,8 @@ if __name__ == '__main__':
         plt.savefig(args.save + '/vis.png', dpi=500)
         logger.info('Saved visualization figure at {}'.format(args.save + '/vis.png'))
 
+    # remove checkpoint
+    if args.train_dir is not None:
+        logger.info('Removing checkpoint at {}'.format(args.train_dir + '/ckpt.pth'))
+        for f in glob.glob(args.train_dir + '/ckpt.pth'):
+            os.remove(f)
