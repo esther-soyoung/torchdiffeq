@@ -400,6 +400,7 @@ if __name__ == '__main__':
                 if args.train_dir is not None:
                     ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
                     torch.save({
+                        'iter': itr,
                         'func_state_dict': func.state_dict(),
                         'rec_state_dict': rec.state_dict(),
                         'dec_state_dict': dec.state_dict(),
@@ -421,6 +422,7 @@ if __name__ == '__main__':
                 if args.train_dir is not None:
                     ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
                     torch.save({
+                        'iter': itr,
                         'func_state_dict': func.state_dict(),
                         'rec_state_dict': rec.state_dict(),
                         'dec_state_dict': dec.state_dict(),
@@ -441,6 +443,7 @@ if __name__ == '__main__':
         if args.train_dir is not None:
             ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
             torch.save({
+                'iter': itr,
                 'func_state_dict': func.state_dict(),
                 'rec_state_dict': rec.state_dict(),
                 'dec_state_dict': dec.state_dict(),
@@ -467,7 +470,7 @@ if __name__ == '__main__':
             samp_trajs = checkpoint['samp_trajs']
             orig_ts = checkpoint['orig_ts']
             samp_ts = checkpoint['samp_ts']
-            logger.info('Loaded ckpt from {}'.format(ckpt_path))
+            logger.info('Loaded {}th ckpt from {}'.format(checkpoint['itr'], ckpt_path))
         with torch.no_grad():
             h = rec.initHidden().to(device)
             for t in reversed(range(samp_trajs.size(1))):  # 100
