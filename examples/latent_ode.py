@@ -470,7 +470,7 @@ if __name__ == '__main__':
             samp_trajs = checkpoint['samp_trajs']
             orig_ts = checkpoint['orig_ts']
             samp_ts = checkpoint['samp_ts']
-            logger.info('Loaded {}th ckpt from {}'.format(checkpoint['itr'], ckpt_path))
+            logger.info('Loaded {}th ckpt from {}'.format(checkpoint['iter'], ckpt_path))
         with torch.no_grad():
             h = rec.initHidden().to(device)
             for t in reversed(range(samp_trajs.size(1))):  # 100
