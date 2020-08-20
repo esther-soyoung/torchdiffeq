@@ -265,7 +265,7 @@ if __name__ == '__main__':
     nspiral = 1000
     start = 0.
     stop = 6 * np.pi  # 19
-    # noise_std = .03
+    noise_std = args.noise # .03
     a = 0.
     b = .3
     # ntotal = 1000
@@ -285,7 +285,7 @@ if __name__ == '__main__':
         ntest=args.ntest,
         start=start,
         stop=stop,
-        noise_std=args.noise,
+        noise_std=noise_std,
         a=a, b=b
     )
     orig_trajs = torch.from_numpy(orig_trajs).float().to(device)  # (1000, 500, 2) of ground-truth
