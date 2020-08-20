@@ -27,7 +27,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--adjoint', type=eval, default=False)
 parser.add_argument('--visualize', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
-parser.add_argument('--nsample', type=int, default=100)
+parser.add_argument('--ntotal', type=int, default=500)  # total number of points in spiral
+parser.add_argument('--nsample', type=int, default=400)  # number of observed points for training
+parser.add_argument('--ntest', type=int, default=100)  # number of points to extrapolate(testing)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
@@ -48,7 +50,8 @@ else:
 
 def generate_spiral2d(nspiral=1000,  # 1000 spirals
                       ntotal=500,  # total number of datapoints per spiral
-                      nsample=100,  # sampled(observed) at equally-spaced timesteps
+                      nsample=400,  # sampled(observed) at equally-spaced timesteps
+                      ntest=100,
                       start=0.,
                       stop=1,  # approximately equal to 6pi
                       noise_std=.1,  # guassian noise for reality
@@ -77,7 +80,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
     # add 1 all timestamps to avoid division by 0
     orig_ts = np.linspace(start, stop, num=ntotal)  # evenly spaced 500 timestamps
     samp_ts = orig_ts[:nsample]  # first 100 timestamps to sample points at
-    test_ts = orig_ts[-nsample:]  # last 100 timestamps to test
+    test_ts = orig_ts[-ntest:]  # last 100 timestamps to test
 
     # generate clock-wise and counter clock-wise spirals in observation space
     # with two sets of time-invariant latent dynamics
@@ -117,7 +120,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
         samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
         samp_trajs.append(samp_traj)
 
-        test_traj = orig_traj[t0_idx - nsample:t0_idx, :].copy()  # 100 points starting from t0_idx
+        test_traj = orig_traj[t0_idx - ntest:t0_idx, :].copy()  # 100 points before t0_idx
         test_traj += npr.randn(*test_traj.shape) * noise_std  # add guassian noise for observation reality
         test_trajs.append(test_traj)
 
@@ -263,7 +266,6 @@ if __name__ == '__main__':
     a = 0.
     b = .3
     # ntotal = 1000
-    nsample = args.nsample  # 100
 
     makedirs(args.save)
     logger = get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
@@ -275,6 +277,9 @@ if __name__ == '__main__':
     # generate toy spiral data
     orig_trajs, samp_trajs, orig_ts, samp_ts, test_trajs, test_ts = generate_spiral2d(
         nspiral=nspiral,
+        ntotal=args.ntotal,  # total number of datapoints per spiral
+        nsample=args.nsample,  # sampled(observed) at equally-spaced timesteps
+        ntest=args.ntest,
         start=start,
         stop=stop,
         noise_std=noise_std,
