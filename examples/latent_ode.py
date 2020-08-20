@@ -443,7 +443,7 @@ if __name__ == '__main__':
         if args.train_dir is not None:
             ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
             torch.save({
-                'iter': itr,
+                'iter': best_rmse['itr'],
                 'func_state_dict': func.state_dict(),
                 'rec_state_dict': rec.state_dict(),
                 'dec_state_dict': dec.state_dict(),

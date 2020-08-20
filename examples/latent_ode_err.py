@@ -26,8 +26,10 @@ random.seed(RANDOM_SEED)
 parser = argparse.ArgumentParser()
 parser.add_argument('--adjoint', type=eval, default=False)
 parser.add_argument('--visualize', type=eval, default=True)
+parser.add_argument('--test', type=eval, default=True)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--nsample', type=int, default=100)
+parser.add_argument('--ntest', type=int, default=100)  # number of testing points
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
@@ -49,6 +51,7 @@ else:
 def generate_spiral2d(nspiral=1000,  # 1000 spirals
                       ntotal=500,  # total number of datapoints per spiral
                       nsample=100,  # sampled(observed) at equally-spaced timesteps
+                      ntest=100,
                       start=0.,
                       stop=1,  # approximately equal to 6pi
                       noise_std=.1,  # guassian noise for reality
@@ -77,7 +80,7 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
     # add 1 all timestamps to avoid division by 0
     orig_ts = np.linspace(start, stop, num=ntotal)  # evenly spaced 500 timestamps
     samp_ts = orig_ts[:nsample]  # first 100 timestamps to sample points at
-    test_ts = orig_ts[-nsample:]  # last 100 timestamps to test
+    test_ts = orig_ts[-ntest:]  # last 100 timestamps to test
 
     # generate clock-wise and counter clock-wise spirals in observation space
     # with two sets of time-invariant latent dynamics
@@ -114,11 +117,11 @@ def generate_spiral2d(nspiral=1000,  # 1000 spirals
         orig_trajs.append(orig_traj)  # ground-truth spiral
 
         samp_traj = orig_traj[t0_idx:t0_idx + nsample, :].copy()  # 100 points starting from t0_idx
-        samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
+        # samp_traj += npr.randn(*samp_traj.shape) * noise_std  # add guassian noise for observation reality
         samp_trajs.append(samp_traj)
 
-        test_traj = orig_traj[t0_idx - nsample:t0_idx, :].copy()  # 100 points starting from t0_idx
-        test_traj += npr.randn(*test_traj.shape) * noise_std  # add guassian noise for observation reality
+        test_traj = orig_traj[t0_idx - ntest:t0_idx, :].copy()  # 100 points starting from t0_idx
+        # test_traj += npr.randn(*test_traj.shape) * noise_std  # add guassian noise for observation reality
         test_trajs.append(test_traj)
 
     # batching for sample trajectories is good for RNN; batching for original
@@ -275,6 +278,9 @@ if __name__ == '__main__':
     # generate toy spiral data
     orig_trajs, samp_trajs, orig_ts, samp_ts, test_trajs, test_ts = generate_spiral2d(
         nspiral=nspiral,
+        ntotal=args.ntotal,  # total number of datapoints per spiral
+        nsample=args.nsample,  # sampled(observed) at equally-spaced timesteps
+        ntest=args.ntest,
         start=start,
         stop=stop,
         noise_std=noise_std,
@@ -395,6 +401,7 @@ if __name__ == '__main__':
                 if args.train_dir is not None:
                     ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
                     torch.save({
+                        'iter': itr,
                         'func_state_dict': func.state_dict(),
                         'rec_state_dict': rec.state_dict(),
                         'dec_state_dict': dec.state_dict(),
@@ -416,6 +423,7 @@ if __name__ == '__main__':
                 if args.train_dir is not None:
                     ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
                     torch.save({
+                        'iter': itr,
                         'func_state_dict': func.state_dict(),
                         'rec_state_dict': rec.state_dict(),
                         'dec_state_dict': dec.state_dict(),
@@ -436,6 +444,7 @@ if __name__ == '__main__':
         if args.train_dir is not None:
             ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
             torch.save({
+                'iter': best_rmse['itr'],
                 'func_state_dict': func.state_dict(),
                 'rec_state_dict': rec.state_dict(),
                 'dec_state_dict': dec.state_dict(),
@@ -449,38 +458,39 @@ if __name__ == '__main__':
     logger.info('Training complete after {} iters.'.format(itr))
 
     ## Test(extrapolation)
-    print('*' * 15 + 'start testing' + '*' * 15)
-    if args.train_dir is not None:
-        ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
-        checkpoint = torch.load(ckpt_path)
-        func.load_state_dict(checkpoint['func_state_dict'])
-        rec.load_state_dict(checkpoint['rec_state_dict'])
-        dec.load_state_dict(checkpoint['dec_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        orig_trajs = checkpoint['orig_trajs']
-        samp_trajs = checkpoint['samp_trajs']
-        orig_ts = checkpoint['orig_ts']
-        samp_ts = checkpoint['samp_ts']
-        logger.info('Loaded ckpt from {}'.format(ckpt_path))
-    with torch.no_grad():
-        h = rec.initHidden().to(device)
-        for t in reversed(range(test_trajs.size(1))):  # 100
-            obs = test_trajs[:, t, :]  # (1000, 2). t'th point of each spiral
-            out, h = rec.forward(obs, h)  # recognition RNN
-        qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]  # latent_dim=4
-        epsilon = torch.randn(qz0_mean.size()).to(device)
-        z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
+    if args.test:
+        logger.info('*' * 15 + 'start testing' + '*' * 15)
+        if args.train_dir is not None:
+            ckpt_path = os.path.join(args.train_dir, 'ckpt.pth')
+            checkpoint = torch.load(ckpt_path)
+            func.load_state_dict(checkpoint['func_state_dict'])
+            rec.load_state_dict(checkpoint['rec_state_dict'])
+            dec.load_state_dict(checkpoint['dec_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            orig_trajs = checkpoint['orig_trajs']
+            samp_trajs = checkpoint['samp_trajs']
+            orig_ts = checkpoint['orig_ts']
+            samp_ts = checkpoint['samp_ts']
+            logger.info('Loaded {}th ckpt from {}'.format(checkpoint['itr'], ckpt_path))
+        with torch.no_grad():
+            h = rec.initHidden().to(device)
+            for t in reversed(range(test_trajs.size(1))):  # 100
+                obs = test_trajs[:, t, :]  # (1000, 2). t'th point of each spiral
+                out, h = rec.forward(obs, h)  # recognition RNN
+            qz0_mean, qz0_logvar = out[:, :latent_dim], out[:, latent_dim:]  # latent_dim=4
+            epsilon = torch.randn(qz0_mean.size()).to(device)
+            z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
-        # forward in time and solve ode for reconstructions
-        end = time.time()
-        pred_z = odeint(func, z0, test_ts, method=args.method).permute(1, 0, 2)
-        pred_x = dec(pred_z)
-        tim = time.time() - end
+            # forward in time and solve ode for reconstructions
+            end = time.time()
+            pred_z = odeint(func, z0, test_ts, method=args.method).permute(1, 0, 2)
+            tim = time.time() - end
+            pred_x = dec(pred_z)
 
-        # compute RMSE
-        criterion = nn.MSELoss()
-        rmse = torch.sqrt(criterion(pred_x, test_trajs))
-    logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
+            # compute RMSE
+            criterion = nn.MSELoss()
+            rmse = torch.sqrt(criterion(pred_x, test_trajs))
+        logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
 
     ## Visualize
     if args.visualize:
