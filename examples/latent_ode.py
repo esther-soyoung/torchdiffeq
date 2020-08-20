@@ -364,8 +364,8 @@ if __name__ == '__main__':
             loss = torch.mean(-logpx + analytic_kl, dim=0)
             # loss += args.l1 * l1
             # loss += args.l2 * l2
-            # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
-            loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
+            loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
+            # loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
             
             loss.backward()
 
@@ -482,8 +482,9 @@ if __name__ == '__main__':
         rmse = torch.sqrt(criterion(pred_x, test_trajs))
     logger.info('#Obs: {}, Test RMSE: {:.4f}, Time: {:.3f}'.format(nsample, rmse, tim))
     # remove checkpoint
-    for f in glob.glob(args.train_dir):
-        os.remove(f)
+    if args.train_dir is not None:
+        for f in glob.glob(args.train_dir + '/ckpt.pth'):
+            os.remove(f)
 
     ## Visualize
     if args.visualize:
