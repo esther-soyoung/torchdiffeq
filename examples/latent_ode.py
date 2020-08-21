@@ -370,8 +370,8 @@ if __name__ == '__main__':
             # loss += args.l2 * l2
 
             # dopri error term regularization
-            # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
-            loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
+            loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
+            # loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
 
             loss.backward()
 
