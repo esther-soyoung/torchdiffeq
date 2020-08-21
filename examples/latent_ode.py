@@ -335,8 +335,6 @@ if __name__ == '__main__':
 
             # forward in time and solve ode for reconstructions
             func.nfe = 0
-            # init kinetic states to 0
-            kin_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
@@ -375,10 +373,6 @@ if __name__ == '__main__':
             # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
             loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
 
-            # kinetic energy regularization
-            kinetic = pred_z_kin[2:]
-            loss += args.kinetic_lambda * torch.mean(kinetic)
-            
             loss.backward()
 
             # for index, weight in enumerate(params, start=1):
