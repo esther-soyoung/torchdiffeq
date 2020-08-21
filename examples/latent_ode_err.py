@@ -31,6 +31,7 @@ parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--ntotal', type=int, default=500)  # total number of points in spiral
 parser.add_argument('--nsample', type=int, default=100)
 parser.add_argument('--ntest', type=int, default=100)  # number of testing points
+parser.add_argument('--noise', type=float, default=0.1)  # gaussian noise stdv
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--gpu', type=int, default=3)
 parser.add_argument('--train_dir', type=str, default=None)  # pretrained
@@ -263,7 +264,7 @@ if __name__ == '__main__':
     nspiral = 1000
     start = 0.
     stop = 6 * np.pi
-    noise_std = .3
+    noise_std = args.noise
     a = 0.
     b = .3
     # ntotal = 1000
