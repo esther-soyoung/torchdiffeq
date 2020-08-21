@@ -40,6 +40,7 @@ parser.add_argument('--method', type=str, default='dopri5')  # euler, dopri5_err
 parser.add_argument('--l1', type=float, default=0)  # lambda for l1 regularization 0.5
 parser.add_argument('--l2', type=float, default=0)  # l2 regularization (Adam.weight_decay) 0.01
 parser.add_argument('--dopri_lambda', type=float, default=0)  # dopri error term as regularizer
+parser.add_argument('--kinetic_lambda', type=float, default=0)  # kinetic energy term as regularizer
 args = parser.parse_args()
 
 if args.adjoint:
@@ -334,12 +335,18 @@ if __name__ == '__main__':
 
             # forward in time and solve ode for reconstructions
             func.nfe = 0
+            # init kinetic states to 0
+            kin_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
+            import pdb
+            pdb.set_trace()
+
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
-            pred_z = pred_z.permute(1, 0, 2)
-            pred_x = dec(pred_z)  # (1000, 100, 2)
+            pred_z_kin, err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
+
+            pred_z = pred_z_kin[:2].permute(1, 0, 2)
+            pred_x = dec(pred_z)  # (1000, 100, 2)
 
             # nfe
             iter_nfe = func.nfe
@@ -353,10 +360,7 @@ if __name__ == '__main__':
             pz0_mean = pz0_logvar = torch.zeros(z0.size()).to(device)
             analytic_kl = normal_kl(qz0_mean, qz0_logvar,
                                     pz0_mean, pz0_logvar).sum(-1)
-
-            # compute RMSE
-            criterion = nn.MSELoss()
-            rmse = torch.sqrt(criterion(pred_x, samp_trajs))
+            loss = torch.mean(-logpx + analytic_kl, dim=0)
 
             # l1, l2 regularization
             l1 = torch.tensor([0.0], requires_grad=True).to(device)
@@ -366,12 +370,16 @@ if __name__ == '__main__':
                 l2 = l2 + parameter.norm(2)
             l1 = nn.Parameter(l1)
             l2 = nn.Parameter(l2)
-
-            loss = torch.mean(-logpx + analytic_kl, dim=0)
             # loss += args.l1 * l1
             # loss += args.l2 * l2
+
+            # dopri error term regularization
             # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
             loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
+
+            # kinetic energy regularization
+            kinetic = pred_z_kin[2:]
+            loss += args.kinetic_lambda * torch.mean(kinetic)
             
             loss.backward()
 
@@ -384,6 +392,10 @@ if __name__ == '__main__':
             
             optimizer.step()
             loss_meter.update(loss.item())
+
+            # compute RMSE
+            criterion = nn.MSELoss()
+            rmse = torch.sqrt(criterion(pred_x, samp_trajs))
 
             # print(torch.autograd.gradcheck(odeint, (z0, samp_ts)))
 
