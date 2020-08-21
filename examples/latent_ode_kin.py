@@ -337,13 +337,15 @@ if __name__ == '__main__':
             func.nfe = 0
             # init kinetic states to 0
             kin_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
+            import pdb
+            pdb.set_trace()
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
+            pred_z_kin, err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
-            pred_z = pred_z.permute(1, 0, 2)
+            pred_z = pred_z_kin[:2].permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
 
             # nfe
