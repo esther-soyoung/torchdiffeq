@@ -339,6 +339,8 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             func.reset_evals()
 
+            kin_states = torch.zeros(z0.size(0)).to(z0) 
+
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_z_kin, err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
