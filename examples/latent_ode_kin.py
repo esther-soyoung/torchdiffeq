@@ -298,8 +298,6 @@ if __name__ == '__main__':
     # model
     odefunc = LatentODEfunc(latent_dim, nhidden).to(device)
     func = RegularizedODEfunc(odefunc, quadratic_cost)
-    import pdb
-    pdb.set_trace()
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
@@ -339,11 +337,7 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
-            func.nfe = 0
-            # init kinetic states to 0
-            kin_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
-            import pdb
-            pdb.set_trace()
+            func.reset_evals()
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
@@ -354,8 +348,7 @@ if __name__ == '__main__':
             pred_x = dec(pred_z)  # (1000, 100, 2)
 
             # nfe
-            iter_nfe = func.nfe
-            epoch_nfe.append(iter_nfe)
+            epoch_nfe.append(func.num_evals())
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std

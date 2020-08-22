@@ -9,12 +9,10 @@ class RegularizedODEfunc(nn.Module):
         self.odefunc = odefunc
         self.regularization_fns = regularization_fns
 
-    def before_odeint(self, *args, **kwargs):
-        self.odefunc.before_odeint(*args, **kwargs)
+    # def before_odeint(self, *args, **kwargs):
+    #     self.odefunc.before_odeint(*args, **kwargs)
 
     def forward(self, t, state):
-
-
         with torch.enable_grad():
             x, logp = state[:2]
             x.requires_grad_(True)
@@ -29,9 +27,11 @@ class RegularizedODEfunc(nn.Module):
                 return dstate
 
     @property
-    def _num_evals(self):
-        return self.odefunc._num_evals
-
+    def num_evals(self):
+        return self.odefunc.nfe
+    
+    def reset_evals(self):
+        self.odefunc.nfe = 0
 
 def total_derivative(x, t, logp, dx, dlogp, unused_context):
     del logp, dlogp, unused_context
