@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import argparse
 import logging
@@ -341,12 +342,12 @@ if __name__ == '__main__':
             pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
-            pred_z = pred_z.permute(1, 0, 2)
-            pred_x = dec(pred_z)  # (1000, 100, 2)
-
             # nfe
             iter_nfe = func.nfe
             epoch_nfe.append(iter_nfe)
+
+            pred_z = pred_z.permute(1, 0, 2)
+            pred_x = dec(pred_z)  # (1000, 100, 2)
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -370,8 +371,9 @@ if __name__ == '__main__':
             # loss += args.l2 * l2
 
             # dopri error term regularization
-            loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
+            # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
             # loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
+            loss += args.dopri_lambda * torch.mean(torch.stack(err))  # mean(1/step)
 
             loss.backward()
 
