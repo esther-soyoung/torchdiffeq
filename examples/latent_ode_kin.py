@@ -158,6 +158,12 @@ class LatentODEfunc(nn.Module):
         out = self.fc3(out)
         return out
 
+    def num_evals(self):
+        return self.nfe
+    
+    def reset_evals(self):
+        self.nfe = 0
+
 
 class RecognitionRNN(nn.Module):
 
