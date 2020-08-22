@@ -1,5 +1,4 @@
 import os
-import sys
 import glob
 import argparse
 import logging
@@ -157,6 +156,12 @@ class LatentODEfunc(nn.Module):
         out = self.fc3(out)
         return out
 
+    def num_evals(self):
+        return self.nfe
+    
+    def reset_evals(self):
+        self.nfe = 0
+
 
 class RecognitionRNN(nn.Module):
 
@@ -225,6 +230,11 @@ def normal_kl(mu1, lv1, mu2, lv2):
 
     kl = lstd2 - lstd1 + ((v1 + (mu1 - mu2) ** 2.) / (2. * v2)) - .5
     return kl
+
+
+def quadratic_cost(dx):
+    dx = dx.view(dx.shape[0], -1)
+    return dx.pow(2).mean(dim=-1)
 
 
 def makedirs(dirname):
@@ -335,19 +345,19 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
-            func.nfe = 0
+            func.reset_evals()
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
             pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
-            # nfe
-            iter_nfe = func.nfe
-            epoch_nfe.append(iter_nfe)
-
             pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
+            kin_states = quadratic_cost(pred_x)
+
+            # nfe
+            epoch_nfe.append(func.num_evals())
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
@@ -365,16 +375,18 @@ if __name__ == '__main__':
             for parameter in func.parameters():
                 l1 = l1 + parameter.norm(1)
                 l2 = l2 + parameter.norm(2)
-            l1 = nn.Parameter(l1)
-            l2 = nn.Parameter(l2)
-            # loss += args.l1 * l1
-            # loss += args.l2 * l2
+                import pdb
+                pdb.set_trace()
+            loss += args.l1 * l1
+            loss += args.l2 * l2
 
             # dopri error term regularization
             # loss += args.dopri_lambda / torch.mean(torch.stack(err))  # 1/mean(step)
-            # loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
-            loss -= args.dopri_lambda * torch.mean(torch.stack(err))  # mean(1/step)
+            loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
 
+            # kinetic energy regularization
+            loss += args.kinetic_lambda * torch.mean(kin_states)
+            
             loss.backward()
 
             # for index, weight in enumerate(params, start=1):
