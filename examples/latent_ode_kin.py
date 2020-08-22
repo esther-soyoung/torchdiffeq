@@ -343,11 +343,13 @@ if __name__ == '__main__':
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            pred_z_kin, err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
+            (pred_z, kin_states), err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
-            pred_z = pred_z_kin[:2].permute(1, 0, 2)
+            pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
+            import pdb
+            pdb.set_trace()
 
             # nfe
             epoch_nfe.append(func.num_evals())
@@ -378,8 +380,7 @@ if __name__ == '__main__':
             loss += args.dopri_lambda * torch.mean(1/torch.stack(err))  # mean(1/step)
 
             # kinetic energy regularization
-            kinetic = pred_z_kin[2:]
-            loss += args.kinetic_lambda * torch.mean(kinetic)
+            loss += args.kinetic_lambda * torch.mean(kin_states)
             
             loss.backward()
 

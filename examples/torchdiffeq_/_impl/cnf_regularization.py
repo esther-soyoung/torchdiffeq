@@ -16,10 +16,8 @@ class RegularizedODEfunc(nn.Module):
         with torch.enable_grad():
             x.requires_grad_(True)
             t.requires_grad_(True)
-            out = self.odefunc(t, x)
-            kin_states = self.kinetic_fns(out)
-            import pdb
-            pdb.set_trace()
+            out = tuple(self.odefunc(t, x))
+            kin_states = tuple(self.kinetic_fns(out))
             return out + kin_states
 
     @property
