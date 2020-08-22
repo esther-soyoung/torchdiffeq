@@ -17,8 +17,8 @@ class RegularizedODEfunc(nn.Module):
             x.requires_grad_(True)
             t.requires_grad_(True)
             out = self.odefunc(t, x)
-            kin_states = tuple(self.kinetic_fns(out))
-            return tuple(out) + kin_states
+            kin_states = self.kinetic_fns(out)
+            return out, kin_states
 
     @property
     def num_evals(self):

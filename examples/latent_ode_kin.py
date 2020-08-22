@@ -296,8 +296,8 @@ if __name__ == '__main__':
     samp_ts = torch.from_numpy(samp_ts).float().to(device)  # first 100 timestamps to sample points at
 
     # model
-    odefunc = LatentODEfunc(latent_dim, nhidden).to(device)
-    func = RegularizedODEfunc(odefunc, quadratic_cost)
+    func = LatentODEfunc(latent_dim, nhidden).to(device)
+    # func = RegularizedODEfunc(odefunc, quadratic_cost)
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
@@ -339,13 +339,12 @@ if __name__ == '__main__':
             # forward in time and solve ode for reconstructions
             func.reset_evals()
 
-            kin_states = torch.zeros(z0.size()).to(z0) 
-
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
-            (pred_z, kin_states), err = odeint_err(func, z0 + kin_states, samp_ts, method=args.method)
+            pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
+            kin_states = quadratic_cost(pred_z)
             pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
             import pdb
