@@ -7,7 +7,7 @@ class RegularizedODEfunc(nn.Module):
     def __init__(self, odefunc, kinetic_fns):
         super(RegularizedODEfunc, self).__init__()
         self.odefunc = odefunc
-        self.regularization_fns = kinetic_fns
+        self.kinetic_fns = kinetic_fns
 
     # def before_odeint(self, *args, **kwargs):
     #     self.odefunc.before_odeint(*args, **kwargs)
