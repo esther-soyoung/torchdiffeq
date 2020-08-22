@@ -13,12 +13,13 @@ class RegularizedODEfunc(nn.Module):
     #     self.odefunc.before_odeint(*args, **kwargs)
 
     def forward(self, t, state):
+        import pdb
+        pdb.set_trace()
         with torch.enable_grad():
-            x, logp = state[:2]
+            # x = state[:2]
             x.requires_grad_(True)
             t.requires_grad_(True)
-            logp.requires_grad_(True)
-            dstate = self.odefunc(t, (x, logp))
+            dstate = self.odefunc(t, x)
             if len(state) > 2:
                 dx, dlogp = dstate[:2]
                 reg_states = tuple(reg_fn(x, t, logp, dx, dlogp, self.odefunc) for reg_fn in self.regularization_fns)

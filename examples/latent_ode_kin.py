@@ -296,8 +296,8 @@ if __name__ == '__main__':
     samp_ts = torch.from_numpy(samp_ts).float().to(device)  # first 100 timestamps to sample points at
 
     # model
-    odefunc = LatentODEfunc(latent_dim, nhidden).to(device)
-    func = RegularizedODEfunc(odefunc, quadratic_cost)
+    func = LatentODEfunc(latent_dim, nhidden).to(device)
+    # func = RegularizedODEfunc(func, quadratic_cost)
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
