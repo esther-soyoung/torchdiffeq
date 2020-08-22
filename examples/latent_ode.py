@@ -403,7 +403,7 @@ if __name__ == '__main__':
             # print(torch.autograd.gradcheck(odeint, (z0, samp_ts)))
 
             logger.info('#Obs: {}, Iter: {}, Running avg elbo: {:.4f}, RMSE: {:.4f}, NFE: {}, Time: {:.3f} (avg {:.3f})'.format(
-                args.nsample, itr, -loss_meter.avg, rmse, iter_nfe, batch_time_meter.val, batch_time_meter.avg))
+                args.nsample, itr, -loss_meter.avg, rmse, epoch_nfe[-1], batch_time_meter.val, batch_time_meter.avg))
 
             # save model
             if itr == 1:
