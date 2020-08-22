@@ -375,8 +375,6 @@ if __name__ == '__main__':
             for parameter in func.parameters():
                 l1 = l1 + parameter.norm(1)
                 l2 = l2 + parameter.norm(2)
-                import pdb
-                pdb.set_trace()
             loss += args.l1 * l1
             loss += args.l2 * l2
 
