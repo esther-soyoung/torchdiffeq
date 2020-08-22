@@ -350,9 +350,9 @@ if __name__ == '__main__':
             pred_z, err = odeint_err(func, z0, samp_ts, method=args.method)
             batch_time_meter.update(time.time() - end)
 
-            kin_states = quadratic_cost(pred_z)
             pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
+            kin_states = quadratic_cost(pred_x)
 
             # nfe
             epoch_nfe.append(func.num_evals())
