@@ -55,6 +55,8 @@ def directional_derivative(x, t, logp, dx, dlogp, unused_context):
     return 0.5*ddx2.mean(dim=-1)
 
 def quadratic_cost(dx):
+    import pdb
+    pdb.set_trace()
     dx = dx.view(dx.shape[0], -1)
     return 0.5*dx.pow(2).mean(dim=-1)
 

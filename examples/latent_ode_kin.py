@@ -353,8 +353,6 @@ if __name__ == '__main__':
             kin_states = quadratic_cost(pred_z)
             pred_z = pred_z.permute(1, 0, 2)
             pred_x = dec(pred_z)  # (1000, 100, 2)
-            import pdb
-            pdb.set_trace()
 
             # nfe
             epoch_nfe.append(func.num_evals())
