@@ -49,6 +49,8 @@ else:
     from torchdiffeq_ import odeint_err as odeint_err
     from torchdiffeq_ import odeint as odeint
 
+from torchdiffeq_ import RegularizedODEfunc, quadratic_cost
+
 # from torchdiffeq_ import odeint, odeint_adjoint
 
 def generate_spiral2d(nspiral=1000,  # 1000 spirals
@@ -294,7 +296,10 @@ if __name__ == '__main__':
     samp_ts = torch.from_numpy(samp_ts).float().to(device)  # first 100 timestamps to sample points at
 
     # model
-    func = LatentODEfunc(latent_dim, nhidden).to(device)
+    odefunc = LatentODEfunc(latent_dim, nhidden).to(device)
+    func = RegularizedODEfun(odefunc, quadratic_cost)
+    import pdb
+    pdb.set_trace()
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
     dec = Decoder(latent_dim, obs_dim, nhidden).to(device)
     params = (list(func.parameters()) + list(dec.parameters()) + list(rec.parameters()))
