@@ -370,8 +370,7 @@ if __name__ == '__main__':
             loss = torch.mean(-logpx + analytic_kl, dim=0)
 
             # l1, l2 regularization
-            l1 = torch.tensor([0.0], requires_grad=True).to(device)
-            l2 = torch.tensor([0.0], requires_grad=True).to(device)
+            l1, l2 = 0, 0
             for parameter in func.parameters():
                 l1 = l1 + parameter.norm(1)
                 l2 = l2 + parameter.norm(2)
