@@ -16,9 +16,9 @@ class RegularizedODEfunc(nn.Module):
         with torch.enable_grad():
             x.requires_grad_(True)
             t.requires_grad_(True)
-            out = tuple(self.odefunc(t, x))
+            out = self.odefunc(t, x)
             kin_states = tuple(self.kinetic_fns(out))
-            return out + kin_states
+            return tuple(out) + kin_states
 
     @property
     def num_evals(self):
