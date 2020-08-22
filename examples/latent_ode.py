@@ -410,7 +410,7 @@ if __name__ == '__main__':
                 best_rmse['itr'] = itr
                 best_rmse['running_avg_elbo'] = -loss_meter.avg
                 best_rmse['rmse'] = rmse
-                best_rmse['nfe'] = iter_nfe
+                best_rmse['nfe'] = epoch_nfe[-1]
                 best_rmse['time'] = batch_time_meter.val
                 best_rmse['avg_time'] = batch_time_meter.avg
                 if args.train_dir is not None:
@@ -432,7 +432,7 @@ if __name__ == '__main__':
                 best_rmse['itr'] = itr
                 best_rmse['running_avg_elbo'] = -loss_meter.avg
                 best_rmse['rmse'] = rmse
-                best_rmse['nfe'] = iter_nfe
+                best_rmse['nfe'] = epoch_nfe[-1]
                 best_rmse['time'] = batch_time_meter.val
                 best_rmse['avg_time'] = batch_time_meter.avg
                 if args.train_dir is not None:
