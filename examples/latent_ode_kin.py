@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
     # model
     odefunc = LatentODEfunc(latent_dim, nhidden).to(device)
-    func = RegularizedODEfun(odefunc, quadratic_cost)
+    func = RegularizedODEfunc(odefunc, quadratic_cost)
     import pdb
     pdb.set_trace()
     rec = RecognitionRNN(latent_dim, obs_dim, rnn_nhidden, nspiral).to(device)
