@@ -9,7 +9,7 @@ from .interp import _interp_fit, _interp_evaluate
 from .rk_common import _RungeKuttaState, _ButcherTableau, _runge_kutta_step
 
 _DORMAND_PRINCE_SHAMPINE_TABLEAU = _ButcherTableau(
-    alpha=[1 / 5, 3 / 10, 4 / 5, 8 / 9, 1., 1.],
+    alpha=[1 / 5, 3 / 10, 4 / 5, 8 / 9, 1., 1.],  # 6
     beta=[
         [1 / 5],
         [3 / 40, 9 / 40],
@@ -17,7 +17,7 @@ _DORMAND_PRINCE_SHAMPINE_TABLEAU = _ButcherTableau(
         [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729],
         [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656],
         [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84],
-    ],
+    ],  # 21
     c_sol=[35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0],
     c_error=[
         35 / 384 - 1951 / 21600,
@@ -90,7 +90,7 @@ class Dopri5ErrSolver(AdaptiveStepsizeODEErrSolver):
         tot_err = []
         while next_t > self.rk_state.t1:
             assert n_steps < self.max_num_steps, 'max_num_steps exceeded ({}>={})'.format(n_steps, self.max_num_steps)
-            self.rk_state, err = self._adaptive_dopri5_step(self.rk_state)
+            self.rk_state, err = self._adaptive_dopri5_step(self.rk_state)  # len(err)==6
             tot_err+=(err)
             n_steps += 1
         return _interp_evaluate(self.rk_state.interp_coeff, self.rk_state.t0, self.rk_state.t1, next_t), tot_err

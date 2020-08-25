@@ -156,10 +156,10 @@ class LatentODEfunc(nn.Module):
         out = self.fc3(out)
         return out
 
-    def num_evals(self):
+    def get_nfe(self):
         return self.nfe
     
-    def reset_evals(self):
+    def reset_nfe(self):
         self.nfe = 0
 
 
@@ -345,7 +345,7 @@ if __name__ == '__main__':
             z0 = epsilon * torch.exp(.5 * qz0_logvar) + qz0_mean
 
             # forward in time and solve ode for reconstructions
-            func.reset_evals()
+            func.reset_nfe()
 
             end = time.time()
             # pred_z = odeint(func, z0, samp_ts, method=args.method).permute(1, 0, 2)
@@ -357,7 +357,7 @@ if __name__ == '__main__':
             kin_states = quadratic_cost(pred_x)
 
             # nfe
-            epoch_nfe.append(func.num_evals())
+            epoch_nfe.append(func.get_nfe())
 
             # compute loss
             noise_std_ = torch.zeros(pred_x.size()).to(device) + noise_std
